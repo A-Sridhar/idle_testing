@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IDLE TESTING MONITOR</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="hero">
+        <h1>IDLE TESTING MONITOR</h1>
+        <p>Monitor idle systems and track their status in real time.</p>
+      </header>
+
+      <section class="panel config-panel">
+        <h2>System Configuration</h2>
+        <div class="config-grid">
+          <label>
+            Number of systems
+            <input id="systemCount" type="number" min="1" max="32" value="1" />
+          </label>
+        </div>
+        <h3>Systems</h3>
+        <div id="systemsContainer" class="systems-grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="summary-head">
+          <h2>Active Summary</h2>
+          <button id="refreshSummary" class="btn btn-secondary" type="button">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>System Name</th>
+                <th>IP</th>
+                <th>Start Date Time</th>
+                <th>Idle (s)</th>
+                <th>Monitor (s)</th>
+                <th>SSH Reattempts</th>
+                <th>Sockets</th>
+                <th>C6</th>
+                <th>PC6</th>
+                <th>Loop</th>
+                <th>Elapsed</th>
+                <th>Time Left</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="summaryBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="summary-head">
+          <h2>Summary</h2>
+          <button id="clearHistory" class="btn btn-secondary" type="button">Clear History</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>System Name</th>
+                <th>IP</th>
+                <th>Start Date Time</th>
+                <th>End Date Time</th>
+                <th>Idle (s)</th>
+                <th>Monitor (s)</th>
+                <th>SSH Reattempts</th>
+                <th>Sockets</th>
+                <th>C6</th>
+                <th>PC6</th>
+                <th>Loop</th>
+                <th>Elapsed</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="previousSummaryBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <template id="systemCardTemplate">
+      <article class="system-card">
+        <div class="system-head">
+          <h3 class="system-title"></h3>
+          <span class="status-pill">idle</span>
+        </div>
+
+        <div class="fields-grid">
+          <label>
+            System Name
+            <input class="field-name" type="text" placeholder="e.g. DMR-SYS-01" />
+          </label>
+          <label>
+            IP Address
+            <input class="field-ip" type="text" placeholder="e.g. 10.10.10.10" />
+          </label>
+          <label>
+            SSH Username
+            <input class="field-username" type="text" placeholder="e.g. root" />
+          </label>
+          <label>
+            SSH Password
+            <input class="field-password" type="password" placeholder="Enter SSH password" />
+          </label>
+          <label>
+            Idle time (seconds)
+            <input class="field-idle" type="number" min="1" value="10" />
+          </label>
+          <label>
+            Monitor duration (seconds)
+            <input class="field-monitor" type="number" min="1" value="60" />
+          </label>
+        </div>
+
+        <div class="system-actions">
+          <button class="btn btn-success btn-start" type="button">Monitor</button>
+        </div>
+
+        <div class="log-line"></div>
+      </article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>

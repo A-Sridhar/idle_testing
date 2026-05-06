@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>System Live Output</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .detail-wrap {
+        width: min(1400px, 96vw);
+        margin: 16px auto;
+        display: grid;
+        gap: 12px;
+      }
+
+      .output-box {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+        background: #fcfffd;
+      }
+
+      pre {
+        margin: 0;
+        max-height: 45vh;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 0.86rem;
+      }
+
+      .detail-meta {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="detail-wrap">
+      <section class="panel">
+        <h2 id="title">System Output</h2>
+        <div id="meta" class="detail-meta"></div>
+      </section>
+      <section class="output-box">
+        <h3>PMUtil Output</h3>
+        <pre id="pmutil">Waiting for data...</pre>
+      </section>
+      <section class="output-box">
+        <h3>Turbostat Output</h3>
+        <pre id="turbostat">Waiting for data...</pre>
+      </section>
+      <section class="panel">
+        <a id="openLog" href="#" target="_blank" rel="noopener noreferrer">Open Log Text</a>
+      </section>
+    </main>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("id");
+      const title = document.getElementById("title");
+      const meta = document.getElementById("meta");
+      const pmutil = document.getElementById("pmutil");
+      const turbostat = document.getElementById("turbostat");
+      const openLog = document.getElementById("openLog");
+      let latestLoop = "-";
+
+      function fillMeta(system) {
+        title.textContent = `System Output: ${system.systemName} (${system.ip})`;
+        meta.innerHTML = "";
+        const lines = [
+          `Latest saved loop: ${latestLoop}`,
+          `Status: ${system.status}`,
+          `Loop: ${(system.loopCount ?? 0)}/${(system.targetRuns ?? 0)}`,
+          `Sockets: ${system.sockets ?? "-"}`,
+          `C6: ${system.c6 ?? "-"}`,
+          `PC6: ${system.pc6 ?? "-"}`,
+          `Elapsed: ${system.elapsedSec ?? 0}s`,
+          `Time Left: ${system.leftSec ?? 0}s`,
+          `Log Path: ${system.logPath || "-"}`
+        ];
+        for (const line of lines) {
+          const div = document.createElement("div");
+          div.textContent = line;
+          meta.appendChild(div);
+        }
+      }
+
+      async function loadDetails() {
+        if (!id) {
+          pmutil.textContent = "Missing system id";
+          turbostat.textContent = "Missing system id";
+          return;
+        }
+
+        const res = await fetch(`/api/systems/${id}/details`);
+        if (!res.ok) {
+          pmutil.textContent = "Unable to load details";
+          turbostat.textContent = "Unable to load details";
+          return;
+        }
+        const data = await res.json();
+        fillMeta(data);
+        pmutil.textContent = data.pmutilOutput || "No PMUtil data yet";
+        turbostat.textContent = data.turbostatOutput || "No Turbostat data yet";
+        openLog.href = `/api/systems/${id}/log`;
+      }
+
+      function connectWs() {
+        const protocol = location.protocol === "https:" ? "wss" : "ws";
+        const ws = new WebSocket(`${protocol}://${location.host}`);
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === "systemOutput" && msg.id === id) {
+              pmutil.textContent = msg.pmutilOutput || "No PMUtil data yet";
+              turbostat.textContent = msg.turbostatOutput || "No Turbostat data yet";
+              latestLoop = msg.loopNumber ?? "-";
+            }
+            if ((msg.type === "systemUpdate" || msg.type === "tick") && msg.system && msg.system.id === id) {
+              fillMeta(msg.system);
+            }
+          } catch (_err) {
+            // ignore malformed ws events
+          }
+        };
+      }
+
+      loadDetails();
+      connectWs();
+      setInterval(loadDetails, 5000);
+    </script>
+  </body>
+</html>
