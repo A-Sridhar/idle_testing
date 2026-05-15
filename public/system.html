@@ -50,8 +50,28 @@
         <h3>Turbostat Output</h3>
         <pre id="turbostat">Waiting for data...</pre>
       </section>
+      <section class="output-box">
+        <h3>Loop Summary</h3>
+        <div style="overflow:auto;max-height:220px;border:1px solid var(--line);border-radius:8px;">
+          <table style="width:100%;border-collapse:collapse;">
+            <thead style="position:sticky;top:0;background:#eef4ef;">
+              <tr>
+                <th style="text-align:left;padding:8px;border-bottom:1px solid #e3ece6;">Loop</th>
+                <th style="text-align:left;padding:8px;border-bottom:1px solid #e3ece6;">C6</th>
+                <th style="text-align:left;padding:8px;border-bottom:1px solid #e3ece6;">PC6</th>
+              </tr>
+            </thead>
+            <tbody id="loopSummaryBodySystem">
+              <tr><td colspan="3" style="padding:8px;color:var(--muted);">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
       <section class="panel">
-        <a id="openLog" href="#" target="_blank" rel="noopener noreferrer">Open Log Text</a>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <a id="openLog" href="#" target="_blank" rel="noopener noreferrer">Open Log Text</a>
+          <button id="downloadLog" class="btn btn-secondary" type="button">&#8615; Download Log</button>
+        </div>
       </section>
     </main>
 
@@ -63,7 +83,102 @@
       const pmutil = document.getElementById("pmutil");
       const turbostat = document.getElementById("turbostat");
       const openLog = document.getElementById("openLog");
+      const loopSummaryBodySystem = document.getElementById("loopSummaryBodySystem");
       let latestLoop = "-";
+
+      function parseTurboStatBlockForC6Pc6(turbostatOutput) {
+        const text = turbostatOutput || "";
+        const lines = text
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean);
+
+        let c6 = null;
+        let pc6 = null;
+
+        for (let i = 0; i < lines.length; i += 1) {
+          const header = lines[i];
+          if (!header.includes("CPU%c6") || !header.includes("Pkg%pc6")) continue;
+
+          const headers = header.split(/\s+/);
+          const cpuC6Idx = headers.indexOf("CPU%c6");
+          const pkgPc6Idx = headers.indexOf("Pkg%pc6");
+          if (cpuC6Idx < 0 || pkgPc6Idx < 0) continue;
+
+          for (let j = i + 1; j < lines.length; j += 1) {
+            const row = lines[j];
+            if (row.includes("CPU%c6") && row.includes("Pkg%pc6")) break;
+            const cols = row.split(/\s+/);
+            if (cols.length <= Math.max(cpuC6Idx, pkgPc6Idx)) continue;
+
+            const cpuVal = Number(cols[cpuC6Idx]);
+            const pkgVal = Number(cols[pkgPc6Idx]);
+            if (!Number.isNaN(cpuVal)) c6 = cpuVal;
+            if (!Number.isNaN(pkgVal)) pc6 = pkgVal;
+          }
+
+          if (c6 !== null || pc6 !== null) break;
+        }
+
+        if (c6 === null) {
+          const c6Match = text.match(/CPU%c6[^0-9]*([0-9]+(?:\.[0-9]+)?)/i);
+          c6 = c6Match ? Number(c6Match[1]) : null;
+        }
+        if (pc6 === null) {
+          const pc6Match = text.match(/Pkg%pc6[^0-9]*([0-9]+(?:\.[0-9]+)?)/i);
+          pc6 = pc6Match ? Number(pc6Match[1]) : null;
+        }
+
+        return { c6, pc6 };
+      }
+
+      function parseLoopSummaryFromLog(logText) {
+        const text = String(logText || "").replace(/\r\n?/g, "\n");
+        const lines = text.split("\n");
+        const byLoop = new Map();
+
+        for (let i = 0; i < lines.length; i += 1) {
+          const line = lines[i].trim();
+          const headerMatch = line.match(/^\[[^\]]+\]\s+LOOP_(\d+)_TURBOSTAT\s*$/i);
+          if (!headerMatch) continue;
+
+          const loopNumber = Number(headerMatch[1]);
+          const blockLines = [];
+          for (let j = i + 1; j < lines.length; j += 1) {
+            const candidate = lines[j].trim();
+            if (/^\[[^\]]+\]\s+\S+/.test(candidate)) break;
+            blockLines.push(lines[j]);
+            i = j;
+          }
+
+          const parsed = parseTurboStatBlockForC6Pc6(blockLines.join("\n"));
+          byLoop.set(loopNumber, { loop: loopNumber, c6: parsed.c6, pc6: parsed.pc6 });
+        }
+
+        return Array.from(byLoop.values()).sort((a, b) => a.loop - b.loop);
+      }
+
+      async function refreshLoopSummary() {
+        if (!id) return;
+        try {
+          const res = await fetch(`/api/systems/${id}/log`);
+          if (!res.ok) {
+            loopSummaryBodySystem.innerHTML = '<tr><td colspan="3" style="padding:8px;color:var(--muted);">Failed to load summary</td></tr>';
+            return;
+          }
+          const logText = await res.text();
+          const rows = parseLoopSummaryFromLog(logText);
+          if (!rows.length) {
+            loopSummaryBodySystem.innerHTML = '<tr><td colspan="3" style="padding:8px;color:var(--muted);">No loop summary found</td></tr>';
+            return;
+          }
+          loopSummaryBodySystem.innerHTML = rows
+            .map((r) => `<tr><td style="padding:8px;border-bottom:1px solid #e3ece6;">${r.loop}</td><td style="padding:8px;border-bottom:1px solid #e3ece6;">${r.c6 ?? "-"}</td><td style="padding:8px;border-bottom:1px solid #e3ece6;">${r.pc6 ?? "-"}</td></tr>`)
+            .join("");
+        } catch (_e) {
+          loopSummaryBodySystem.innerHTML = '<tr><td colspan="3" style="padding:8px;color:var(--muted);">Error loading summary</td></tr>';
+        }
+      }
 
       function fillMeta(system) {
         title.textContent = `System Output: ${system.systemName} (${system.ip})`;
@@ -129,6 +244,26 @@
       loadDetails();
       connectWs();
       setInterval(loadDetails, 5000);
+      refreshLoopSummary();
+      setInterval(refreshLoopSummary, 5000);
+
+      document.getElementById("downloadLog").addEventListener("click", async () => {
+        if (!id) return;
+        try {
+          const res = await fetch(`/api/systems/${id}/log`);
+          const text = res.ok ? await res.text() : "Failed to load log.";
+          const sysTitle = (title.textContent || id).replace(/[^a-zA-Z0-9._-]/g, "_");
+          const blob = new Blob([text], { type: "text/plain" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${sysTitle}_log.txt`;
+          a.click();
+          URL.revokeObjectURL(url);
+        } catch (_e) {
+          alert("Error downloading log.");
+        }
+      });
     </script>
   </body>
 </html>

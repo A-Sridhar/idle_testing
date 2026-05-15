@@ -9,20 +9,74 @@
   <body>
     <main class="container">
       <header class="hero">
-        <h1>IDLE TESTING MONITOR</h1>
-        <p>Monitor idle systems and track their status in real time.</p>
+        <div class="hero-content">
+          <div>
+            <h1>IDLE TESTING MONITOR</h1>
+            <p>Monitor idle systems and track their status in real time.</p>
+          </div>
+          <div class="role-selector">
+            <label for="roleSelect">Access Level:</label>
+            <select id="roleSelect">
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        </div>
       </header>
 
       <section class="panel config-panel">
-        <h2>System Configuration</h2>
+        <h2>Add System</h2>
         <div class="config-grid">
           <label>
-            Number of systems
-            <input id="systemCount" type="number" min="1" max="32" value="1" />
+            System Name
+            <input id="formSystemName" type="text" placeholder="e.g. DMR-SYS-01" />
+          </label>
+          <label>
+            IP Address
+            <input id="formSystemIp" type="text" placeholder="e.g. 10.10.10.10" />
+          </label>
+          <label>
+            SSH OS Type
+            <select id="formSshOsType">
+              <option value="centos">CentOS</option>
+              <option value="windows">Windows</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          <label id="formSystemUsernameWrapper" style="display: none;">
+            SSH Username
+            <input id="formSystemUsername" type="text" placeholder="e.g. root" />
+          </label>
+          <label id="formSystemPasswordWrapper" style="display: none;">
+            SSH Password
+            <input id="formSystemPassword" type="password" placeholder="Enter SSH password" />
+          </label>
+          <label>
+            Idle Time
+            <div class="time-selector">
+              <input id="formIdleTime" type="number" min="1" value="10" style="flex: 1;" />
+              <select id="formIdleUnit">
+                <option value="s">Seconds</option>
+                <option value="m">Minutes</option>
+              </select>
+            </div>
+          </label>
+          <label>
+            Monitor Duration
+            <div class="time-selector">
+              <input id="formMonitorDuration" type="number" min="1" value="60" style="flex: 1;" />
+              <select id="formMonitorUnit">
+                <option value="s">Seconds</option>
+                <option value="m">Minutes</option>
+              </select>
+            </div>
           </label>
         </div>
-        <h3>Systems</h3>
-        <div id="systemsContainer" class="systems-grid"></div>
+        <div class="form-actions">
+          <button id="addSystemBtn" class="btn btn-success" type="button">Add & Monitor</button>
+          <button id="clearFormBtn" class="btn btn-secondary" type="button">Clear</button>
+        </div>
+        <div id="formError" style="color: var(--warn); margin-top: 8px; display: none; font-size: 0.9rem;"></div>
       </section>
 
       <section class="panel">
@@ -34,6 +88,7 @@
           <table>
             <thead>
               <tr>
+                <th>#</th>
                 <th>System Name</th>
                 <th>IP</th>
                 <th>Start Date Time</th>
@@ -63,6 +118,7 @@
           <table>
             <thead>
               <tr>
+                <th>#</th>
                 <th>System Name</th>
                 <th>IP</th>
                 <th>Start Date Time</th>
@@ -76,6 +132,7 @@
                 <th>Loop</th>
                 <th>Elapsed</th>
                 <th>Status</th>
+                <th>Stop Reason</th>
               </tr>
             </thead>
             <tbody id="previousSummaryBody"></tbody>
@@ -125,6 +182,63 @@
         <div class="log-line"></div>
       </article>
     </template>
+
+    <!-- Log popup modal -->
+    <div id="logModal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="logModalTitle">
+      <div class="modal-box">
+        <div class="modal-head">
+          <h3 id="logModalTitle">System Log</h3>
+          <div class="modal-actions">
+            <button id="logModalDownload" class="btn btn-secondary" type="button">&#8615; Download</button>
+            <button id="logModalClose" class="btn btn-secondary" type="button" aria-label="Close">&#x2715;</button>
+          </div>
+        </div>
+        <pre id="logModalContent" class="log-modal-pre">Loading...</pre>
+        <div class="loop-summary-wrap">
+          <h4>Loop-wise Summary</h4>
+          <div class="loop-summary-table-wrap">
+            <table class="loop-summary-table">
+              <thead>
+                <tr>
+                  <th>Loop</th>
+                  <th>C6</th>
+                  <th>PC6</th>
+                </tr>
+              </thead>
+              <tbody id="loopSummaryBody">
+                <tr>
+                  <td colspan="3" class="empty">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Login Modal -->
+    <div id="adminLoginModal" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="adminLoginTitle">
+      <div class="modal-box" style="max-width: 320px;">
+        <div class="modal-head">
+          <h3 id="adminLoginTitle">Admin Login</h3>
+        </div>
+        <div style="padding: 20px;">
+          <label style="display: block; margin-bottom: 12px;">
+            <span style="display: block; margin-bottom: 4px; font-size: 0.9rem; color: var(--muted);">Username</span>
+            <input id="adminUsername" type="text" placeholder="admin" style="width: 100%; padding: 8px; border: 1px solid #b7ccc2; border-radius: 6px; font-size: 0.95rem;" />
+          </label>
+          <label style="display: block; margin-bottom: 16px;">
+            <span style="display: block; margin-bottom: 4px; font-size: 0.9rem; color: var(--muted);">Password</span>
+            <input id="adminPassword" type="password" placeholder="••••••••" style="width: 100%; padding: 8px; border: 1px solid #b7ccc2; border-radius: 6px; font-size: 0.95rem;" />
+          </label>
+          <div id="adminLoginError" style="color: var(--warn); font-size: 0.85rem; margin-bottom: 12px; display: none;"></div>
+          <div style="display: flex; gap: 8px;">
+            <button id="adminLoginBtn" class="btn btn-success" type="button" style="flex: 1;">Login</button>
+            <button id="adminLoginCancel" class="btn btn-secondary" type="button" style="flex: 1;">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <script src="app.js"></script>
   </body>

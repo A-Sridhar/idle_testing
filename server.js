@@ -7,8 +7,13 @@ const { WebSocketServer } = require("ws");
 const { Client } = require("ssh2");
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
-const logsDir = path.join(__dirname, "logs");
+const PORT = Number(process.env.PORT) || 80;
+const HOST = process.env.HOST || "0.0.0.0";
+const logsDir = process.env.LOGS_DIR
+  ? path.isAbsolute(process.env.LOGS_DIR)
+    ? process.env.LOGS_DIR
+    : path.resolve(__dirname, process.env.LOGS_DIR)
+  : path.join(__dirname, "logs");
 
 const DEFAULT_COMMANDS = {
   pmutil: process.env.DEFAULT_PMUTIL_COMMAND || "cd /root/apps/PI_PM/pmutil && ./pmutil_bin -i",
@@ -19,9 +24,10 @@ const DEFAULT_COMMANDS = {
 
 const DEFAULT_SSH_USERNAME = process.env.SSH_USERNAME || "";
 const DEFAULT_SSH_PASSWORD = process.env.SSH_PASSWORD || "";
-const SSH_READY_TIMEOUT_MS = 10000;
+const SSH_READY_TIMEOUT_MS = 30000;          // per-attempt connection timeout (30s)
 const SSH_COMMAND_TIMEOUT_MS = 15000;
 const SSH_RECOVERY_RETRY_MS = 1000;
+const SSH_MAX_RECOVERY_DURATION_MS = 60 * 60 * 1000; // keep retrying for up to 1 hour
 const SSH_HEARTBEAT_INTERVAL_MS = 5000;
 const SSH_REATTEMPT_COUNT_THRESHOLD_MS = 10000;
 
@@ -168,6 +174,7 @@ function toSummaryView(system) {
     leftSec,
     logPath: system.logPath,
     error: system.error,
+    stopReason: system.stopReason || null,
     idleTimeSec: system.idleTimeSec,
     monitorDurationSec: system.monitorDurationSec
   };
@@ -388,6 +395,13 @@ function stopMonitoring(system, status, errorMessage) {
   system.error = errorMessage || null;
   if (status !== "running") {
     system.endedAt = Date.now();
+    // Ensure stopped/completed systems do not keep showing as SSH-failed.
+    system.sshFailureSince = null;
+    system.sshRecoveryDisplayUntil = null;
+    system.sshRecoveredAt = null;
+    if (!errorMessage) {
+      system.lastSshError = null;
+    }
   }
   broadcast({ type: "systemUpdate", system: toSummaryView(system) });
 }
@@ -401,13 +415,9 @@ async function startMonitoring(system) {
   const durationSec = Math.max(1, Number(system.monitorDurationSec) || 1);
   const targetRuns = Math.floor(durationSec / idleSec);
 
-  if (targetRuns < 1) {
-    stopMonitoring(system, "completed", null);
-    return;
-  }
-
   system.status = "running";
   system.error = null;
+  system.stopReason = null;
   system.startedAt = Date.now();
   system.endedAt = null;
   system.loopCount = 0;
@@ -435,6 +445,12 @@ async function startMonitoring(system) {
       return;
     }
 
+    // Stop retrying if SSH has been down for longer than the max recovery window
+    if (system.sshFailureSince && (Date.now() - system.sshFailureSince) > SSH_MAX_RECOVERY_DURATION_MS) {
+      stopMonitoring(system, "error", "SSH unreachable for over 1 hour — monitoring stopped");
+      return;
+    }
+
     const isRecoveryMode = Boolean(system.sshFailureSince);
     const plannedAt = system.startedAt + (system.loopCount + 1) * idleSec * 1000;
     const waitMs = isRecoveryMode
@@ -445,8 +461,44 @@ async function startMonitoring(system) {
       try {
         if (isRecoveryMode) {
           await probeSshRecovery(system);
+          // Re-check status after the await — stop may have been called while connection was in-flight
+          if (system.status !== "running") return;
+
+          // After SSH recovery, log the recovery message and immediately retry collecting the failed loop
+          const recoveryMsg = `SSH connection successful after ${system.lastReconnectSec || 0} seconds. Retrying loop ${system.loopCount}.`;
+          console.log(`[SSH RECOVERED] ${recoveryMsg}`);
+          await appendLog(system.logPath, "SSH_RECOVERY", recoveryMsg);
+
+          // Broadcast the recovery status
           broadcast({ type: "systemUpdate", system: toSummaryView(system) });
-          scheduleNextRun();
+
+          // Immediately retry collecting the failed loop
+          try {
+            system.collectionInFlight = true;
+            await collectOnce(system, system.loopCount);
+            system.collectionInFlight = false;
+            broadcast({ type: "systemUpdate", system: toSummaryView(system) });
+
+            // Check if all loops are complete
+            if (system.loopCount >= system.targetRuns) {
+              stopMonitoring(system, "completed", null);
+              return;
+            }
+
+            // Continue with the next loop
+            scheduleNextRun();
+          } catch (retryErr) {
+            // If retry fails, go back to recovery mode
+            if (!system.sshFailureSince) {
+              system.sshFailureSince = Date.now();
+            }
+            system.error = "SSH connection failed";
+            system.lastSshError = String(retryErr?.message || retryErr || "SSH error").replace(/\s+/g, " ").trim();
+            system.collectionInFlight = false;
+            await appendLog(system.logPath, "ERROR", retryErr.stack || String(retryErr));
+            broadcast({ type: "systemUpdate", system: toSummaryView(system) });
+            scheduleNextRun();
+          }
           return;
         }
 
@@ -482,11 +534,11 @@ async function startMonitoring(system) {
     }, waitMs);
   };
 
-  // Collect first loop immediately without waiting
+  // Collect first loop immediately without waiting (loop 0 = first-time data)
   (async () => {
     try {
-      system.loopCount = 1;
-      console.log(`[FIRST LOOP IMMEDIATE] System: ${system.systemName} - Collecting loop 1/${system.targetRuns} immediately`);
+      system.loopCount = 0;
+      console.log(`[FIRST LOOP IMMEDIATE] System: ${system.systemName} - Collecting loop 0 (first-time data) immediately`);
       broadcast({ type: "systemUpdate", system: toSummaryView(system) });
 
       system.collectionInFlight = true;
@@ -494,7 +546,8 @@ async function startMonitoring(system) {
       system.collectionInFlight = false;
       broadcast({ type: "systemUpdate", system: toSummaryView(system) });
 
-      if (system.loopCount >= system.targetRuns) {
+      if (system.targetRuns === 0) {
+        // No timed loops fit in the requested duration, so only loop 0 is collected.
         stopMonitoring(system, "completed", null);
         return;
       }
@@ -603,6 +656,7 @@ app.post("/api/systems", async (req, res) => {
     startedAt: null,
     endedAt: null,
     error: null,
+    stopReason: null,
     lastPmutil: "",
     lastTurbostat: "",
     lastParsed: {
@@ -654,8 +708,14 @@ app.post("/api/systems/:id/stop", async (req, res) => {
     res.status(404).json({ error: "System not found" });
     return;
   }
+  const reason = String(req.body?.reason || "").trim();
+  if (!reason) {
+    res.status(400).json({ error: "Stop reason is required" });
+    return;
+  }
+  system.stopReason = reason;
   stopMonitoring(system, "stopped", null);
-  await appendLog(system.logPath, "STOPPED", "Monitoring stopped by user");
+  await appendLog(system.logPath, "STOPPED", `Monitoring stopped by user. Reason: ${reason}`);
   res.json(toSummaryView(system));
 });
 
@@ -688,14 +748,15 @@ app.get("/api/systems/:id/log", async (req, res) => {
   }
 });
 
-const server = app.listen(PORT, async () => {
+const server = app.listen(PORT, HOST, async () => {
   await ensureLogsDir();
   if (!DEFAULT_SSH_USERNAME || !DEFAULT_SSH_PASSWORD) {
     console.warn(
       "[STARTUP WARNING] SSH_USERNAME/SSH_PASSWORD env vars are not set. You must enter SSH Username/Password per system card before starting monitoring."
     );
   }
-  console.log(`Server listening on http://localhost:${PORT}`);
+  console.log(`[STARTUP] Logs directory: ${logsDir}`);
+  console.log(`Server listening on http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}`);
 });
 
 const wss = new WebSocketServer({ server });

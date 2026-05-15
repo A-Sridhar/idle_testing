@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project Review — SSH Monitor UI (Idle Testing Monitor)</title>
+  <style>
+    :root {
+      --primary: #1a6b3c;
+      --primary-light: #2d9057;
+      --primary-bg: #f0f7f2;
+      --accent: #0066cc;
+      --accent-light: #e8f2ff;
+      --warn: #c84b11;
+      --warn-bg: #fff4ee;
+      --text: #1c2b22;
+      --muted: #5a7a62;
+      --line: #c8dfd0;
+      --card-bg: #ffffff;
+      --section-bg: #f8fbf9;
+      --tag-green: #d4edda;
+      --tag-blue: #cce5ff;
+      --tag-orange: #ffe0cc;
+      --tag-purple: #e8d5ff;
+      --shadow: 0 2px 12px rgba(26,107,60,0.08);
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--section-bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 15px;
+    }
+
+    /* ── Layout ─────────────────────────────── */
+    .page { max-width: 1100px; margin: 0 auto; padding: 0 24px 60px; }
+
+    /* ── Cover Hero ──────────────────────────── */
+    .cover {
+      background: linear-gradient(135deg, #0d4a28 0%, #1a6b3c 60%, #2d9057 100%);
+      color: #fff;
+      padding: 56px 40px 48px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .cover::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+    .cover-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      padding: 4px 16px;
+      font-size: 12px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 18px;
+    }
+    .cover h1 {
+      font-size: 2.6rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 12px;
+    }
+    .cover p {
+      font-size: 1.15rem;
+      opacity: 0.85;
+      max-width: 640px;
+      margin: 0 auto 28px;
+    }
+    .cover-pills { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    .cover-pill {
+      background: rgba(255,255,255,0.18);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    /* ── TOC ─────────────────────────────────── */
+    .toc {
+      background: var(--card-bg);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 28px 32px;
+      margin: 32px 0 0;
+      box-shadow: var(--shadow);
+    }
+    .toc h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 16px; }
+    .toc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+    .toc-item {
+      display: flex; align-items: center; gap: 8px;
+      text-decoration: none;
+      color: var(--primary);
+      font-size: 14px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      transition: background 0.15s;
+    }
+    .toc-item:hover { background: var(--primary-bg); }
+    .toc-num {
+      background: var(--primary-bg);
+      color: var(--primary);
+      border-radius: 50%;
+      width: 22px; height: 22px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* ── Sections ────────────────────────────── */
+    .section {
+      margin-top: 40px;
+      background: var(--card-bg);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 32px 36px;
+      box-shadow: var(--shadow);
+    }
+    .section-header {
+      display: flex; align-items: center; gap: 14px;
+      border-bottom: 2px solid var(--primary-bg);
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+    .section-icon {
+      width: 42px; height: 42px;
+      background: var(--primary-bg);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .section-header h2 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .section-header .section-num {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Cards grid ──────────────────────────── */
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 18px 20px;
+      background: var(--section-bg);
+    }
+    .card-icon { font-size: 28px; margin-bottom: 10px; }
+    .card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 6px; color: var(--primary); }
+    .card p { font-size: 13.5px; color: var(--muted); }
+
+    /* ── Architecture diagram ────────────────── */
+    .arch {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      padding: 12px 0;
+    }
+    .arch-row { display: flex; gap: 16px; align-items: center; justify-content: center; flex-wrap: wrap; }
+    .arch-box {
+      border: 2px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 20px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      min-width: 130px;
+    }
+    .arch-box.green { background: var(--primary-bg); border-color: var(--primary); color: var(--primary); }
+    .arch-box.blue  { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+    .arch-box.orange{ background: var(--warn-bg); border-color: var(--warn); color: var(--warn); }
+    .arch-box.gray  { background: #f4f4f4; border-color: #bbb; color: #555; }
+    .arch-arrow {
+      font-size: 22px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1;
+      padding: 6px 0;
+    }
+    .arch-label { font-size: 11px; font-weight: 500; color: var(--muted); margin-top: 4px; }
+
+    /* ── Flow steps ──────────────────────────── */
+    .flow { display: flex; flex-direction: column; gap: 0; }
+    .flow-step {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      position: relative;
+      padding-bottom: 20px;
+    }
+    .flow-step::before {
+      content: '';
+      position: absolute;
+      left: 19px;
+      top: 40px;
+      bottom: 0;
+      width: 2px;
+      background: var(--line);
+    }
+    .flow-step:last-child::before { display: none; }
+    .flow-num {
+      width: 40px; height: 40px;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 700;
+      flex-shrink: 0;
+      z-index: 1;
+    }
+    .flow-content h4 { font-size: 1rem; font-weight: 700; margin-bottom: 4px; color: var(--text); }
+    .flow-content p  { font-size: 13.5px; color: var(--muted); }
+
+    /* ── API table ───────────────────────────── */
+    .api-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .api-table th {
+      background: var(--primary-bg);
+      color: var(--primary);
+      text-align: left;
+      padding: 10px 14px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .api-table td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .api-table tr:last-child td { border-bottom: none; }
+    .api-table tr:hover td { background: var(--primary-bg); }
+    .method {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      font-family: monospace;
+    }
+    .method.get  { background: #cce5ff; color: #004085; }
+    .method.post { background: #d4edda; color: #155724; }
+
+    /* ── File tree ───────────────────────────── */
+    .tree { font-family: 'Consolas', 'Fira Code', monospace; font-size: 13px; line-height: 2; }
+    .tree .dir  { color: var(--primary); font-weight: 700; }
+    .tree .file { color: var(--text); }
+    .tree .desc { color: var(--muted); font-size: 12px; margin-left: 8px; font-family: sans-serif; }
+    .tree-line  { padding: 1px 0; }
+
+    /* ── Config table ────────────────────────── */
+    .config-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .config-table th {
+      background: var(--primary-bg);
+      color: var(--primary);
+      text-align: left;
+      padding: 10px 14px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .config-table td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .config-table tr:last-child td { border-bottom: none; }
+    code {
+      background: var(--primary-bg);
+      color: var(--primary);
+      border-radius: 4px;
+      padding: 1px 7px;
+      font-size: 13px;
+      font-family: 'Consolas', 'Fira Code', monospace;
+    }
+
+    /* ── Tags / Badges ───────────────────────── */
+    .tag {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .tag.green  { background: var(--tag-green); color: #155724; }
+    .tag.blue   { background: var(--tag-blue);  color: #004085; }
+    .tag.orange { background: var(--tag-orange); color: #7b3800; }
+    .tag.purple { background: var(--tag-purple); color: #5a2d80; }
+
+    /* ── Tech stack grid ─────────────────────── */
+    .stack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+    .stack-item {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px 18px;
+      background: var(--section-bg);
+      display: flex; gap: 12px; align-items: flex-start;
+    }
+    .stack-icon { font-size: 26px; flex-shrink: 0; }
+    .stack-item h4 { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
+    .stack-item p  { font-size: 12.5px; color: var(--muted); }
+
+    /* ── Summary stat boxes ──────────────────── */
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+    .stat-box {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 18px 16px;
+      text-align: center;
+      background: var(--section-bg);
+    }
+    .stat-box .stat-val { font-size: 2rem; font-weight: 800; color: var(--primary); line-height: 1; }
+    .stat-box .stat-lbl { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+    /* ── Print ───────────────────────────────── */
+    @media print {
+      body { background: #fff; font-size: 12px; }
+      .cover { background: #1a6b3c !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .section { box-shadow: none; break-inside: avoid; }
+      .no-print { display: none !important; }
+    }
+
+    /* ── Print / PDF button ──────────────────── */
+    .print-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .print-bar span { font-size: 13px; color: var(--muted); }
+    .btn-print {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex; align-items: center; gap: 7px;
+      transition: background 0.15s;
+    }
+    .btn-print:hover { background: var(--primary-light); }
+
+    ul.feature-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    ul.feature-list li {
+      display: flex; align-items: flex-start; gap: 10px;
+      font-size: 14px; color: var(--text);
+    }
+    ul.feature-list li::before {
+      content: '✓';
+      background: var(--primary);
+      color: #fff;
+      border-radius: 50%;
+      width: 20px; height: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .highlight-box {
+      background: var(--primary-bg);
+      border-left: 4px solid var(--primary);
+      border-radius: 0 8px 8px 0;
+      padding: 14px 18px;
+      margin: 16px 0;
+      font-size: 14px;
+      color: var(--text);
+    }
+    .warn-box {
+      background: var(--warn-bg);
+      border-left: 4px solid var(--warn);
+      border-radius: 0 8px 8px 0;
+      padding: 14px 18px;
+      margin: 16px 0;
+      font-size: 14px;
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Print bar ── -->
+<div class="print-bar no-print">
+  <span>📄 SSH Monitor UI — Project Review</span>
+  <button class="btn-print" onclick="window.print()">🖨️ Save as PDF / Print</button>
+</div>
+
+<!-- ── Cover ── -->
+<div class="cover">
+  <div class="cover-badge">Project Review</div>
+  <h1>SSH Monitor UI</h1>
+  <p>Idle Testing Monitor — a real-time web application to monitor multiple Linux/Windows systems over SSH, collecting CPU idle-state and power data on a timed schedule.</p>
+  <div class="cover-pills">
+    <span class="cover-pill">🖥️ Node.js + Express</span>
+    <span class="cover-pill">🔌 WebSocket</span>
+    <span class="cover-pill">🔑 SSH2</span>
+    <span class="cover-pill">🌐 Vanilla JS Frontend</span>
+    <span class="cover-pill">📊 PMUtil + Turbostat</span>
+    <span class="cover-pill">📁 File-based Logging</span>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- ── TOC ── -->
+  <div class="toc">
+    <h2>Table of Contents</h2>
+    <div class="toc-grid">
+      <a class="toc-item" href="#overview">     <span class="toc-num">1</span> Project Overview</a>
+      <a class="toc-item" href="#stats">        <span class="toc-num">2</span> At a Glance</a>
+      <a class="toc-item" href="#features">     <span class="toc-num">3</span> Key Features</a>
+      <a class="toc-item" href="#stack">        <span class="toc-num">4</span> Tech Stack</a>
+      <a class="toc-item" href="#architecture"><span class="toc-num">5</span> Architecture</a>
+      <a class="toc-item" href="#flow">         <span class="toc-num">6</span> How It Works</a>
+      <a class="toc-item" href="#files">        <span class="toc-num">7</span> File Structure</a>
+      <a class="toc-item" href="#pages">        <span class="toc-num">8</span> Frontend Pages</a>
+      <a class="toc-item" href="#api">          <span class="toc-num">9</span> API Reference</a>
+      <a class="toc-item" href="#config">       <span class="toc-num">10</span> Configuration</a>
+      <a class="toc-item" href="#ssh">          <span class="toc-num">11</span> SSH Resilience</a>
+      <a class="toc-item" href="#setup">        <span class="toc-num">12</span> Quick Start</a>
+    </div>
+  </div>
+
+  <!-- ── 1. Overview ── -->
+  <div class="section" id="overview">
+    <div class="section-header">
+      <div class="section-icon">🔭</div>
+      <div>
+        <div class="section-num">SECTION 1</div>
+        <h2>Project Overview</h2>
+      </div>
+    </div>
+    <p style="margin-bottom:14px; font-size:15px;">
+      <strong>SSH Monitor UI</strong> (branded as <em>Idle Testing Monitor</em>) is a full-stack web application
+      designed for Intel's hardware validation teams. Its purpose is to remotely connect to multiple servers via SSH,
+      run <strong>PMUtil</strong> and <strong>Turbostat</strong> diagnostic commands on a repeating schedule, and
+      surface the collected CPU C-state / power data in a live dashboard — all without needing to manually log into
+      each machine.
+    </p>
+    <div class="highlight-box">
+      <strong>Core use-case:</strong> An engineer wants to verify that several test systems enter deep CPU idle states
+      (C6, PC6) during an "idle" soak test. They add each system's IP and credentials to the UI, set an idle interval
+      and total duration, hit <em>Add &amp; Monitor</em>, and the tool handles the rest — collecting, parsing, logging,
+      and displaying data in real time.
+    </div>
+    <p style="font-size:14px; color: var(--muted);">
+      The app is built entirely on open-source Node.js packages and runs directly on Windows (with <code>start.bat</code>)
+      or any platform that has Node.js. No database is required — all persistent data is stored in log files under the
+      <code>logs/</code> directory.
+    </p>
+  </div>
+
+  <!-- ── 2. At a Glance ── -->
+  <div class="section" id="stats">
+    <div class="section-header">
+      <div class="section-icon">📊</div>
+      <div>
+        <div class="section-num">SECTION 2</div>
+        <h2>At a Glance</h2>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="stat-val">~25KB</div>
+        <div class="stat-lbl">Backend (server.js)</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val">5</div>
+        <div class="stat-lbl">Frontend files</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val">8</div>
+        <div class="stat-lbl">REST API endpoints</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val">WS</div>
+        <div class="stat-lbl">Real-time updates</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val">4</div>
+        <div class="stat-lbl">npm dependencies</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val">∞</div>
+        <div class="stat-lbl">Systems (concurrent)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 3. Features ── -->
+  <div class="section" id="features">
+    <div class="section-header">
+      <div class="section-icon">✨</div>
+      <div>
+        <div class="section-num">SECTION 3</div>
+        <h2>Key Features</h2>
+      </div>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-icon">🖥️</div>
+        <h3>Multi-system Monitoring</h3>
+        <p>Add unlimited systems. Each system runs its own independent monitoring loop concurrently.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">⏱️</div>
+        <h3>Configurable Scheduling</h3>
+        <p>Per-system idle interval and total monitor duration. Target run count is auto-calculated.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📡</div>
+        <h3>Real-time WebSocket UI</h3>
+        <p>Live dashboard updates via WebSocket — no page refresh needed. Data streams as it arrives.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔑</div>
+        <h3>SSH with Auto-Recovery</h3>
+        <p>If SSH drops, the backend automatically retries. It pauses the timer and resumes when the connection is restored — for up to 1 hour.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📈</div>
+        <h3>C6 / PC6 Parsing</h3>
+        <p>Automatically extracts CPU%c6 and Pkg%pc6 values from Turbostat output tables, plus socket count from PMUtil.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📂</div>
+        <h3>Timestamped Log Files</h3>
+        <p>Every loop's PMUtil and Turbostat output is appended to a timestamped log file per system.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">👤</div>
+        <h3>Role-based Access</h3>
+        <p>User vs Admin roles. Admins can stop monitors and clear history. Admin login is gated by password.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🪟</div>
+        <h3>Live Output Window</h3>
+        <p>Each system has a dedicated live output page (system.html) that shows raw PMUtil and Turbostat text in real time.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">⚙️</div>
+        <h3>Portable via Env Vars</h3>
+        <p>PORT, HOST, LOGS_DIR, SSH credentials, and default commands — all configurable via environment variables.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 4. Tech Stack ── -->
+  <div class="section" id="stack">
+    <div class="section-header">
+      <div class="section-icon">🛠️</div>
+      <div>
+        <div class="section-num">SECTION 4</div>
+        <h2>Tech Stack</h2>
+      </div>
+    </div>
+    <div class="stack-grid">
+      <div class="stack-item">
+        <div class="stack-icon">🟢</div>
+        <div>
+          <h4>Node.js</h4>
+          <p>JavaScript runtime powering the backend server</p>
+        </div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-icon">🚂</div>
+        <div>
+          <h4>Express 4</h4>
+          <p>HTTP server, REST API routing, and static file serving</p>
+        </div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-icon">🔑</div>
+        <div>
+          <h4>ssh2</h4>
+          <p>Pure-JS SSH client. Opens connections and executes remote commands</p>
+        </div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-icon">🔌</div>
+        <div>
+          <h4>ws (WebSocket)</h4>
+          <p>Server-side WebSocket for pushing live updates to all browser clients</p>
+        </div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-icon">🌐</div>
+        <div>
+          <h4>Vanilla HTML/CSS/JS</h4>
+          <p>No framework. Pure browser-side code for maximum portability</p>
+        </div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-icon">📁</div>
+        <div>
+          <h4>Node.js fs/promises</h4>
+          <p>Async file I/O for appending log blocks per system loop</p>
+        </div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-icon">🔄</div>
+        <div>
+          <h4>cors</h4>
+          <p>Cross-Origin Resource Sharing support for flexible deployment</p>
+        </div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-icon">🔁</div>
+        <div>
+          <h4>nodemon (dev)</h4>
+          <p>Hot-reload during development — auto-restarts on file changes</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 5. Architecture ── -->
+  <div class="section" id="architecture">
+    <div class="section-header">
+      <div class="section-icon">🏗️</div>
+      <div>
+        <div class="section-num">SECTION 5</div>
+        <h2>Architecture Diagram</h2>
+      </div>
+    </div>
+
+    <div class="arch">
+      <!-- Browser Layer -->
+      <div class="arch-row">
+        <div class="arch-box blue">
+          🌐 Browser Client<br><small>index.html + app.js</small>
+        </div>
+        <div class="arch-box blue">
+          🪟 Live Output Window<br><small>system.html</small>
+        </div>
+      </div>
+      <div class="arch-arrow">↕ HTTP REST + WebSocket (ws://)</div>
+
+      <!-- Backend Layer -->
+      <div class="arch-row">
+        <div class="arch-box green">
+          🚂 Express HTTP Server<br><small>server.js — port 80</small>
+        </div>
+        <div class="arch-box green">
+          🔌 WebSocket Server<br><small>ws (built on same port)</small>
+        </div>
+      </div>
+      <div class="arch-arrow">↕ ssh2 Client (password auth)</div>
+
+      <!-- Remote Systems -->
+      <div class="arch-row">
+        <div class="arch-box orange">🖥️ Remote System A<br><small>Linux / CentOS</small></div>
+        <div class="arch-box orange">🖥️ Remote System B<br><small>Linux / CentOS</small></div>
+        <div class="arch-box orange">🖥️ Remote System …<br><small>Linux / Windows</small></div>
+      </div>
+      <div class="arch-arrow">↓ Writes</div>
+
+      <!-- Storage -->
+      <div class="arch-row">
+        <div class="arch-box gray">
+          📁 logs/ directory<br><small>One .txt file per system</small>
+        </div>
+        <div class="arch-box gray">
+          🗺️ In-memory Map<br><small>systems Map (runtime state)</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="highlight-box" style="margin-top:20px;">
+      <strong>Key design choice:</strong> The server holds all system state in a JavaScript <code>Map</code> in memory.
+      There is no database. Logs are the only persistent storage. This makes the app extremely simple to deploy but means
+      state is lost on server restart.
+    </div>
+  </div>
+
+  <!-- ── 6. How It Works ── -->
+  <div class="section" id="flow">
+    <div class="section-header">
+      <div class="section-icon">🔄</div>
+      <div>
+        <div class="section-num">SECTION 6</div>
+        <h2>How It Works — Data Flow</h2>
+      </div>
+    </div>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-num">1</div>
+        <div class="flow-content">
+          <h4>User Adds a System</h4>
+          <p>User fills in system name, IP, SSH credentials, idle time, and monitor duration on the main page and clicks <em>Add &amp; Monitor</em>. The browser POSTs to <code>POST /api/systems</code> which registers the system in the in-memory <code>Map</code> and immediately starts monitoring.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">2</div>
+        <div class="flow-content">
+          <h4>Backend Starts the Monitoring Loop</h4>
+          <p><code>startMonitoring()</code> initialises all counters, marks status as <code>running</code>, and calls <code>scheduleNextRun()</code> to schedule the first data collection using <code>setTimeout</code>. The loop count and target runs are computed from the idle / duration settings.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">3</div>
+        <div class="flow-content">
+          <h4>SSH Connection &amp; Command Execution</h4>
+          <p>On each loop tick, <code>collectOnce()</code> opens a fresh SSH connection via <code>ssh2</code>. It executes the <strong>PMUtil</strong> command first, then the <strong>Turbostat</strong> command sequentially, capturing stdout from each. Each command has a 15-second timeout.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">4</div>
+        <div class="flow-content">
+          <h4>Parsing &amp; Extraction</h4>
+          <p><code>parseSockets()</code> extracts the socket count from PMUtil output via regex. <code>parseTurboStat()</code> locates the header row containing <code>CPU%c6</code> and <code>Pkg%pc6</code> in the tabular output, then reads values from the first data row — this is the key metric for idle state validation.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">5</div>
+        <div class="flow-content">
+          <h4>Logging to File</h4>
+          <p>Raw PMUtil and Turbostat output is appended to a per-system timestamped log file under <code>logs/</code>. Each block is prefixed with an ISO timestamp and a label like <code>LOOP_3_PMUTIL</code>, making logs human-readable and machine-parseable.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">6</div>
+        <div class="flow-content">
+          <h4>WebSocket Broadcast</h4>
+          <p>After each collection, the backend calls <code>broadcast()</code> which sends two events to all connected browsers: a <code>systemUpdate</code> (summary stats) and a <code>systemOutput</code> (raw text). Both the main dashboard and any open live-output windows receive these in real time.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">7</div>
+        <div class="flow-content">
+          <h4>Loop Continues or Stops</h4>
+          <p>After each successful collection, the loop counter increments and <code>scheduleNextRun()</code> is called again using the planned tick time (aligned to the original start time) to prevent drift. When <code>loopCount &gt;= targetRuns</code>, the system is marked <code>completed</code>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 7. File Structure ── -->
+  <div class="section" id="files">
+    <div class="section-header">
+      <div class="section-icon">📁</div>
+      <div>
+        <div class="section-num">SECTION 7</div>
+        <h2>File Structure</h2>
+      </div>
+    </div>
+    <div class="tree">
+      <div class="tree-line"><span class="dir">📦 project root/</span></div>
+      <div class="tree-line">&nbsp;&nbsp;├── <span class="file">server.js</span><span class="desc">⭐ Main backend — Express + WebSocket + SSH monitoring logic (~25 KB)</span></div>
+      <div class="tree-line">&nbsp;&nbsp;├── <span class="file">package.json</span><span class="desc">npm metadata, scripts (start / dev), and 4 dependencies</span></div>
+      <div class="tree-line">&nbsp;&nbsp;├── <span class="file">.env.example</span><span class="desc">Template for environment variable configuration</span></div>
+      <div class="tree-line">&nbsp;&nbsp;├── <span class="file">start.bat</span><span class="desc">Windows one-click launcher</span></div>
+      <div class="tree-line">&nbsp;&nbsp;├── <span class="file">README.md</span><span class="desc">Setup instructions and API reference</span></div>
+      <div class="tree-line">&nbsp;&nbsp;├── <span class="dir">📂 public/</span><span class="desc">All static frontend assets (served by Express)</span></div>
+      <div class="tree-line">&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="file">index.html</span><span class="desc">⭐ Main dashboard — Add System form, Active Summary, History</span></div>
+      <div class="tree-line">&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="file">app.js</span><span class="desc">⭐ Frontend logic — role management, WebSocket, API calls, table rendering</span></div>
+      <div class="tree-line">&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="file">styles.css</span><span class="desc">Shared CSS for all pages — green theme, cards, tables, modals</span></div>
+      <div class="tree-line">&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="file">system.html</span><span class="desc">Per-system live output page — shows PMUtil/Turbostat raw text + loop summary</span></div>
+      <div class="tree-line">&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└── <span class="file">one-page-summary.html</span><span class="desc">Printable/shareable summary view</span></div>
+      <div class="tree-line">&nbsp;&nbsp;└── <span class="dir">📂 logs/</span><span class="desc">Auto-created at runtime — one .txt log file per monitored system</span></div>
+    </div>
+    <div class="highlight-box" style="margin-top:18px;">
+      <strong>Naming convention for log files:</strong> <code>&lt;systemName&gt;_&lt;ip&gt;_&lt;timestamp&gt;.txt</code><br>
+      Each file contains timestamped blocks for every loop: <code>LOOP_N_PMUTIL</code>, <code>LOOP_N_TURBOSTAT</code>, and any <code>ERROR</code> or <code>SSH_RECOVERY</code> entries.
+    </div>
+  </div>
+
+  <!-- ── 8. Frontend Pages ── -->
+  <div class="section" id="pages">
+    <div class="section-header">
+      <div class="section-icon">🖼️</div>
+      <div>
+        <div class="section-num">SECTION 8</div>
+        <h2>Frontend Pages</h2>
+      </div>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-icon">🏠</div>
+        <h3>index.html — Main Dashboard</h3>
+        <p>
+          The primary view. Contains:<br>
+          • <strong>Add System form</strong> (name, IP, OS type, credentials, idle time, duration)<br>
+          • <strong>Active Summary table</strong> (live updating, shows Sockets, C6, PC6, elapsed, time left, SSH retries)<br>
+          • <strong>History table</strong> (all stopped/completed systems with start/end times and stop reason)<br>
+          • <strong>Role selector</strong> (User / Admin)<br>
+          • <strong>Log modal</strong> (view or download per-system log, with loop-wise C6/PC6 table)
+        </p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📺</div>
+        <h3>system.html — Live Output</h3>
+        <p>
+          Opens in a new tab for any selected system. Shows:<br>
+          • Raw PMUtil output (latest)<br>
+          • Raw Turbostat output (latest)<br>
+          • Loop-wise C6/PC6 summary table (parsed from log file)<br>
+          • Link to download the full log<br>
+          Updates every 5 seconds and via WebSocket.
+        </p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📋</div>
+        <h3>one-page-summary.html</h3>
+        <p>A compact, printable single-page overview. Designed for reporting or sharing test results.</p>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;">
+      <h3 style="margin-bottom:12px; font-size:1rem; color:var(--primary);">app.js Responsibilities</h3>
+      <ul class="feature-list">
+        <li>Connects to the backend WebSocket and handles <code>systemUpdate</code> / <code>systemOutput</code> / <code>tick</code> messages</li>
+        <li>Renders and updates the Active Summary and History tables dynamically</li>
+        <li>Manages role state (User/Admin) with localStorage persistence and Admin login modal</li>
+        <li>Handles the Add System form submission (<code>POST /api/systems</code>)</li>
+        <li>Opens the log modal, fetches log text, and parses loop-wise C6/PC6 summary from it</li>
+        <li>Stop button sends <code>POST /api/systems/:id/stop</code> (Admin only)</li>
+        <li>Clear History button (Admin only) removes completed/stopped entries from the summary</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── 9. API Reference ── -->
+  <div class="section" id="api">
+    <div class="section-header">
+      <div class="section-icon">🔌</div>
+      <div>
+        <div class="section-num">SECTION 9</div>
+        <h2>API Reference</h2>
+      </div>
+    </div>
+    <table class="api-table">
+      <thead>
+        <tr>
+          <th>Method</th>
+          <th>Endpoint</th>
+          <th>Description</th>
+          <th>Response</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="method get">GET</span></td>
+          <td><code>/health</code></td>
+          <td>Health check — confirms server is running</td>
+          <td><code>{ status: "ok" }</code></td>
+        </tr>
+        <tr>
+          <td><span class="method get">GET</span></td>
+          <td><code>/api/systems</code></td>
+          <td>List all systems (including stopped/completed) with their full summary view</td>
+          <td>Array of system summary objects</td>
+        </tr>
+        <tr>
+          <td><span class="method get">GET</span></td>
+          <td><code>/api/systems/active</code></td>
+          <td>List only currently running systems</td>
+          <td>Array of running system summaries</td>
+        </tr>
+        <tr>
+          <td><span class="method post">POST</span></td>
+          <td><code>/api/systems</code></td>
+          <td>Register a new system and start monitoring. Body: <code>{ systemName, ip, username, password, idleTimeSec, monitorDurationSec, … }</code></td>
+          <td>Created system summary</td>
+        </tr>
+        <tr>
+          <td><span class="method post">POST</span></td>
+          <td><code>/api/systems/:id/start</code></td>
+          <td>Re-start monitoring on an existing (stopped/completed) system</td>
+          <td>Updated system summary</td>
+        </tr>
+        <tr>
+          <td><span class="method post">POST</span></td>
+          <td><code>/api/systems/:id/stop</code></td>
+          <td>Manually stop a running system (Admin action)</td>
+          <td>Updated system summary with <code>status: "stopped"</code></td>
+        </tr>
+        <tr>
+          <td><span class="method get">GET</span></td>
+          <td><code>/api/systems/:id/details</code></td>
+          <td>Get the latest raw PMUtil and Turbostat output for a system (used by system.html)</td>
+          <td>System summary + <code>pmutilOutput</code> + <code>turbostatOutput</code></td>
+        </tr>
+        <tr>
+          <td><span class="method get">GET</span></td>
+          <td><code>/api/systems/:id/log</code></td>
+          <td>Download/view the full text log file for a system</td>
+          <td>Plain text log file</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="margin-top:20px;">
+      <h3 style="font-size:1rem; margin-bottom:10px; color:var(--primary);">WebSocket Events</h3>
+      <table class="api-table">
+        <thead>
+          <tr><th>Event Type</th><th>Direction</th><th>Payload</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>systemUpdate</code></td>
+            <td>Server → Client</td>
+            <td>Full system summary object — triggers table row refresh on dashboard</td>
+          </tr>
+          <tr>
+            <td><code>systemOutput</code></td>
+            <td>Server → Client</td>
+            <td>Raw PMUtil + Turbostat text for a specific system ID — used by system.html</td>
+          </tr>
+          <tr>
+            <td><code>tick</code></td>
+            <td>Server → Client</td>
+            <td>Periodic heartbeat with elapsed/remaining time updates for all active systems</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── 10. Config ── -->
+  <div class="section" id="config">
+    <div class="section-header">
+      <div class="section-icon">⚙️</div>
+      <div>
+        <div class="section-num">SECTION 10</div>
+        <h2>Configuration (Environment Variables)</h2>
+      </div>
+    </div>
+    <table class="config-table">
+      <thead>
+        <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>PORT</code></td><td><code>80</code></td><td>HTTP port the server listens on</td></tr>
+        <tr><td><code>HOST</code></td><td><code>0.0.0.0</code></td><td>Bind address — use machine IP to share over LAN</td></tr>
+        <tr><td><code>LOGS_DIR</code></td><td><code>./logs</code></td><td>Directory where log files are stored (absolute or relative)</td></tr>
+        <tr><td><code>SSH_USERNAME</code></td><td><em>empty</em></td><td>Global fallback SSH username when per-system field is blank</td></tr>
+        <tr><td><code>SSH_PASSWORD</code></td><td><em>empty</em></td><td>Global fallback SSH password when per-system field is blank</td></tr>
+        <tr><td><code>DEFAULT_PMUTIL_COMMAND</code></td><td><code>cd /root/apps/PI_PM/pmutil && ./pmutil_bin -i</code></td><td>Override the default PMUtil shell command</td></tr>
+        <tr><td><code>DEFAULT_TURBOSTAT_COMMAND</code></td><td><code>./turbostat -q -s … -interval 1 -n 5</code></td><td>Override the default Turbostat shell command</td></tr>
+      </tbody>
+    </table>
+    <div class="warn-box" style="margin-top:16px;">
+      <strong>⚠️ Security note:</strong> SSH passwords are transmitted in plain text from the browser to the backend.
+      Ensure the app runs on a trusted internal network. Do not expose port 80 to the public internet.
+      The <code>SSH_PASSWORD</code> env var keeps credentials out of the browser form, but it is shared across all systems.
+    </div>
+  </div>
+
+  <!-- ── 11. SSH Resilience ── -->
+  <div class="section" id="ssh">
+    <div class="section-header">
+      <div class="section-icon">🛡️</div>
+      <div>
+        <div class="section-num">SECTION 11</div>
+        <h2>SSH Resilience &amp; Recovery Logic</h2>
+      </div>
+    </div>
+    <p style="margin-bottom:16px; font-size:14px;">One of the most important backend features is the automatic SSH recovery system:</p>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-num" style="background:var(--warn);">!</div>
+        <div class="flow-content">
+          <h4>SSH Failure Detected</h4>
+          <p>If a connection attempt or heartbeat fails, <code>sshFailureSince</code> is set to the current timestamp. The timer is paused (elapsed time tracking excludes the pause duration).</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">↺</div>
+        <div class="flow-content">
+          <h4>Retry Every 1 Second</h4>
+          <p><code>probeSshRecovery()</code> is called every <strong>1 second</strong> using a short <code>SSH_RECOVERY_RETRY_MS</code> timeout. This aggressively probes for reconnection.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">✓</div>
+        <div class="flow-content">
+          <h4>Recovery Detected</h4>
+          <p>On success, <code>markSshRecovered()</code> calculates the total pause duration, increments <code>sshReattemptCount</code> (if paused &gt; 10 s), resets all failure flags, and logs a recovery message. The UI shows a green recovery banner for 8 seconds.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num" style="background:#888;">✗</div>
+        <div class="flow-content">
+          <h4>1-Hour Timeout Limit</h4>
+          <p>If SSH remains unreachable for more than <strong>1 hour</strong> (<code>SSH_MAX_RECOVERY_DURATION_MS</code>), the system is permanently stopped with status <code>error</code> and the reason "SSH unreachable for over 1 hour".</p>
+        </div>
+      </div>
+    </div>
+    <div class="highlight-box" style="margin-top:12px;">
+      A separate <strong>SSH heartbeat</strong> also runs every <strong>5 seconds</strong> during normal operation to proactively detect SSH drops even between scheduled loops. This ensures failures are reported immediately without waiting for the next data collection.
+    </div>
+  </div>
+
+  <!-- ── 12. Quick Start ── -->
+  <div class="section" id="setup">
+    <div class="section-header">
+      <div class="section-icon">🚀</div>
+      <div>
+        <div class="section-num">SECTION 12</div>
+        <h2>Quick Start</h2>
+      </div>
+    </div>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-num">1</div>
+        <div class="flow-content">
+          <h4>Install dependencies</h4>
+          <p><code>npm install</code> — installs express, ssh2, ws, cors</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">2</div>
+        <div class="flow-content">
+          <h4>Configure (optional)</h4>
+          <p>Copy <code>.env.example</code> to <code>.env</code> and set <code>SSH_USERNAME</code>, <code>SSH_PASSWORD</code>, etc. Or set env vars inline.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">3</div>
+        <div class="flow-content">
+          <h4>Start the server</h4>
+          <p><code>npm start</code> (production) or <code>npm run dev</code> (nodemon watch mode). On Windows you can also double-click <code>start.bat</code>.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">4</div>
+        <div class="flow-content">
+          <h4>Open the UI</h4>
+          <p>Navigate to <code>http://localhost</code> (or <code>http://&lt;your-ip&gt;:PORT</code> from another machine on the same network).</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">5</div>
+        <div class="flow-content">
+          <h4>Add a system and monitor</h4>
+          <p>Fill in the system name, IP, SSH credentials, set idle time and monitor duration, then click <strong>Add &amp; Monitor</strong>. Watch data populate in the Active Summary table in real time.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align:center; padding: 40px 0 10px; color: var(--muted); font-size: 13px;">
+    Generated by GitHub Copilot · SSH Monitor UI Project Review
+    <br><br>
+    <button class="btn-print no-print" onclick="window.print()" style="margin: 0 auto;">🖨️ Save as PDF</button>
+  </div>
+
+</div>
+</body>
+</html>

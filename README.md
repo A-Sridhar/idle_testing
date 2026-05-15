@@ -11,7 +11,7 @@ Web app to monitor multiple systems over SSH and collect PMUtil and Turbostat da
   - System name, IP, sockets (from PMUtil), C6 and PC6 (from Turbostat), elapsed, time left
 - Real-time SSH failure and recovery status in Active Summary
 - SSH reattempt count in Active Summary and Summary
-- Logs saved as text files under `logs/`
+- Logs saved as text files under repo-local `logs/` (or custom `LOGS_DIR`)
 
 ## Stack
 - Node.js + Express backend
@@ -39,13 +39,15 @@ Web app to monitor multiple systems over SSH and collect PMUtil and Turbostat da
    ```
 4. Open:
    ```
-   http://localhost:3000
+   http://localhost
    ```
 
 ## Portable Configuration
 You can run this app on any system by setting environment variables instead of editing code.
 
-- `PORT` (default: `3000`)
+- `PORT` (default: `80`)
+- `HOST` (default: `0.0.0.0` for LAN access)
+- `LOGS_DIR` (default: `logs` inside repo)
 - `SSH_USERNAME` (optional global fallback when per-system value is blank)
 - `SSH_PASSWORD` (optional global fallback when per-system value is blank)
 - `DEFAULT_PMUTIL_COMMAND` (optional)
@@ -54,6 +56,8 @@ You can run this app on any system by setting environment variables instead of e
 PowerShell example:
 ```powershell
 $env:PORT = "8080"
+$env:HOST = "0.0.0.0"
+$env:LOGS_DIR = "logs"
 $env:SSH_USERNAME = "myuser"
 $env:SSH_PASSWORD = "mypassword"
 npm start
@@ -61,7 +65,7 @@ npm start
 
 Linux/macOS example:
 ```bash
-PORT=8080 SSH_USERNAME=myuser SSH_PASSWORD=mypassword npm start
+PORT=8080 HOST=0.0.0.0 LOGS_DIR=logs SSH_USERNAME=myuser SSH_PASSWORD=mypassword npm start
 ```
 
 ## Configuration Notes
@@ -72,6 +76,8 @@ PORT=8080 SSH_USERNAME=myuser SSH_PASSWORD=mypassword npm start
 - Backend uses password authentication over SSH.
 - Per-system SSH username/password can be entered in each card.
 - If both per-system SSH credentials and env vars are blank, monitor start is blocked with a clear error.
+- App binds to `HOST`; use your machine IP plus `PORT` to open UI from other systems on the same network.
+- Ensure OS firewall allows inbound access to selected `PORT`.
 - Idle time controls data collection interval.
 - Monitor duration controls total run time per system.
 
