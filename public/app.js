@@ -329,24 +329,30 @@ function renderSummary() {
 	} else {
 		for (let index = 0; index < active.length; index++) {
 			const system = active[index];
-			const tr = document.createElement("tr");
-			tr.innerHTML = `
-				<td>${index + 1}</td>
-				<td>${activeSystemCellHtml(system)}</td>
-				<td>${system.ip || "-"}</td>
-				<td>${fmtDateTime(system.startDateTime)}</td>
-				<td>${system.idleTimeSec || "-"}</td>
-				<td>${system.monitorDurationSec || "-"}</td>
-				<td>${system.sshReattemptCount ?? 0}</td>
-				<td>${system.sockets ?? "-"}</td>
-				<td>${metricHtml(system.c6)}</td>
-				<td>${metricHtml(system.pc6)}</td>
-				<td>${fmtLoop(system)}</td>
-				<td>${fmtSec(system.elapsedSec)}</td>
-				<td>${fmtSec(system.leftSec)}</td>
-				<td><button class="btn btn-danger btn-stop-summary" data-system-id="${system.id}" type="button">Stop</button></td>
-			`;
-			summaryBody.appendChild(tr);
+			   const tr = document.createElement("tr");
+			   // Highlight SSH failure (status error + sshFailed)
+			   let rowClass = "";
+			   if (system.status === "error" && system.sshFailed) {
+				   rowClass = "ssh-failed-row";
+			   }
+			   tr.className = rowClass;
+			   tr.innerHTML = `
+				   <td>${index + 1}</td>
+				   <td>${activeSystemCellHtml(system)}</td>
+				   <td>${system.ip || "-"}</td>
+				   <td>${fmtDateTime(system.startDateTime)}</td>
+				   <td>${system.idleTimeSec || "-"}</td>
+				   <td>${system.monitorDurationSec || "-"}</td>
+				   <td>${system.sshReattemptCount ?? 0}</td>
+				   <td>${system.sockets ?? "-"}</td>
+				   <td>${metricHtml(system.c6)}</td>
+				   <td>${metricHtml(system.pc6)}</td>
+				   <td>${fmtLoop(system)}</td>
+				   <td>${fmtSec(system.elapsedSec)}</td>
+				   <td>${fmtSec(system.leftSec)}</td>
+				   <td><button class="btn btn-danger btn-stop-summary" data-system-id="${system.id}" type="button">Stop</button></td>
+			   `;
+			   summaryBody.appendChild(tr);
 		}
 	}
 
@@ -553,6 +559,35 @@ function renderLoopSummary(logText) {
 	if (!rows.length) {
 		loopSummaryBody.innerHTML = '<tr><td colspan="3" class="empty">No loop summary found in log</td></tr>';
 		return;
+	}
+
+	// Collect warning loops
+	const warningLoops = rows.filter(row => {
+		return (typeof row.c6 === 'number' && row.c6 < 90) || (typeof row.pc6 === 'number' && row.pc6 < 90);
+	}).map(row => row.loop);
+
+	// Show warning message if needed
+	const warningDivId = "loopWarningMsg";
+	let warningDiv = document.getElementById(warningDivId);
+	if (!warningDiv) {
+		const loopSummaryWrap = document.querySelector('.loop-summary-wrap');
+		if (loopSummaryWrap) {
+			warningDiv = document.createElement('div');
+			warningDiv.id = warningDivId;
+			warningDiv.style.color = 'var(--warn, #d9534f)';
+			warningDiv.style.fontWeight = 'bold';
+			warningDiv.style.margin = '8px 0';
+			loopSummaryWrap.insertBefore(warningDiv, loopSummaryWrap.firstChild.nextSibling);
+		}
+	}
+	if (warningDiv) {
+		if (warningLoops.length > 0) {
+			warningDiv.textContent = `Warning: C6 or PC6 < 90 in loop(s): ${warningLoops.join(', ')}`;
+			warningDiv.style.display = '';
+		} else {
+			warningDiv.textContent = '';
+			warningDiv.style.display = 'none';
+		}
 	}
 
 	loopSummaryBody.innerHTML = rows
